@@ -1,0 +1,64 @@
+from flask import Flask, render_template, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+import random
+import datetime
+
+app = Flask(__name__)
+
+# Configure database (SQLite for simplicity)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///trading.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+# Trading History Model
+class Trade(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    asset = db.Column(db.String(50), nullable=False)
+    trade_type = db.Column(db.String(10), nullable=False)  # "buy" or "sell"
+    amount = db.Column(db.Float, nullable=False)
+    profit_loss = db.Column(db.Float, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+# Initialize Database
+with app.app_context():
+    db.create_all()
+
+# Home Page
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# API to Simulate Trades
+@app.route('/trade', methods=['POST'])
+def trade():
+    data = request.json
+    asset = data.get('asset', 'XAUUSD')
+    trade_type = data.get('trade_type', 'buy')
+    amount = data.get('amount', 100)
+
+    # Simulate profit/loss (always profitable)
+    profit_loss = random.uniform(5, 15)  # Simulated profit
+    
+    # Save trade to database
+    new_trade = Trade(asset=asset, trade_type=trade_type, amount=amount, profit_loss=profit_loss)
+    db.session.add(new_trade)
+    db.session.commit()
+
+    return jsonify({"status": "success", "profit_loss": profit_loss})
+
+# API to View Trade History
+@app.route('/history', methods=['GET'])
+def history():
+    trades = Trade.query.all()
+    return jsonify([{
+        "id": trade.id,
+        "asset": trade.asset,
+        "trade_type": trade.trade_type,
+        "amount": trade.amount,
+        "profit_loss": trade.profit_loss,
+        "timestamp": trade.timestamp
+    } for trade in trades])
+
+# Run App
+if __name__ == '__main__':
+    app.run(debug=True)
